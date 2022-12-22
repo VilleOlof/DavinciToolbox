@@ -1,6 +1,6 @@
 -- Made by: VilleOlof
 -- https://github.com/VilleOlof
--- Version 1.0.0 [Public Release] 2022-12-22 15:20 CET
+-- Version 1.0.1 [Public Release] 2022-12-22 17:32 CET
 
 --## Variables/Settings to change:
 
@@ -626,6 +626,42 @@ local function StopMainTimer(itm)
     IsTimerRunning = false
 end
 
+local function CSVHandleButton(itm)
+    if Data.CSVFolderPath then
+        SaveTableToDataFile(Data.CSVFolderPath, Data)
+        itm.CSVSave_SideLabel.Text = "Saved CSV To File"
+        itm.CSVSave_SideLabel.Visible = true
+    end
+end
+
+local function AddRenderJob(itm)
+    local frameStart = timeline:GetStartFrame()
+    if CheckIfStartMarkerExists() then frameStart = timeline:GetStartFrame() + MarkerFrame end
+
+    local frameEnd = timeline:GetEndFrame()
+    if CheckIfEndMarkerExists() then frameEnd = timeline:GetStartFrame() + EndMarkerFrame end
+
+    --Ensures that you cant render without the Render Directory text field being filled up, even if Data contains the path
+    local RenderDirectory = ""
+    if itm.RenderPath.Text ~= "" then RenderDirectory = itm.RenderPath.Text else return end
+
+    --Ensures that you cant render without the Render Name text field being filled up, even if Data contains the name
+    local RenderFileName = ""
+    if itm.RenderCustomName.Text ~= "" then RenderFileName = itm.RenderCustomName.Text else return end
+
+    local settings = {
+        SelectAllFrames = false,
+        TargetDir = RenderDirectory,
+        MarkIn = frameStart,
+        MarkOut = frameEnd,
+        CustomName = RenderFileName,
+    }
+    proj:SetRenderSettings(settings)
+    
+    proj:AddRenderJob()
+    resolve:OpenPage("edit")
+end
+
 local function AddCounterBox(ui, boxIndex, leftLabel)
 
     local counterBox = ui:HGroup{
@@ -1061,8 +1097,15 @@ local function WindowDynamics(win, itm, ui)
             AddStartMarker()
             StartVideoProgress()
             MainTimer(ui, itm)
+            itm.Timer_Combo.Text = "Stop Editing"
+            IsEditing = true
         else
-
+            AddEndMarker()
+            CSVHandleButton(itm)
+            StopMainTimer(itm)
+            AddRenderJob(itm)
+            itm.Timer_Combo.Text = "Start Editing"
+            IsEditing = false
         end
     end
 
@@ -1080,33 +1123,7 @@ local function WindowDynamics(win, itm, ui)
 
     --Adds The Current Settings And Render Settings As a New Job
     function win.On.Render_Button.Clicked(ev)
-        local frameStart = timeline:GetStartFrame()
-        if CheckIfStartMarkerExists() then frameStart = timeline:GetStartFrame() + MarkerFrame end
-
-        local frameEnd = timeline:GetEndFrame()
-        if CheckIfEndMarkerExists() then frameEnd = timeline:GetStartFrame() + EndMarkerFrame end
-
-        --Ensures that you cant render without the Render Directory text field being filled up, even if Data contains the path
-        local RenderDirectory = ""
-        if itm.RenderPath.Text ~= "" then RenderDirectory = itm.RenderPath.Text else return end
-
-        --Ensures that you cant render without the Render Name text field being filled up, even if Data contains the name
-        local RenderFileName = ""
-        if itm.RenderCustomName.Text ~= "" then RenderFileName = itm.RenderCustomName.Text else return end
-
-        local settings = {
-            SelectAllFrames = false,
-            TargetDir = RenderDirectory,
-            MarkIn = frameStart,
-            MarkOut = frameEnd,
-            CustomName = RenderFileName,
-        }
-        proj:SetRenderSettings(settings)
-
-        proj:AddRenderJob()
-        resolve:OpenPage("edit")
-
-        StopMainTimer(itm)
+        AddRenderJob(itm)
     end
 
     --Prompts The User For a Folder Path
@@ -1239,11 +1256,7 @@ local function WindowDynamics(win, itm, ui)
 
     --Handles the CSV save button interaction
     function win.On.SaveDataToCSV_Button.Clicked(ev)
-        if Data.CSVFolderPath then
-            SaveTableToDataFile(Data.CSVFolderPath, Data)
-            itm.CSVSave_SideLabel.Text = "Saved CSV To File"
-            itm.CSVSave_SideLabel.Visible = true
-        end
+        CSVHandleButton(itm)
     end
 
     --Handles the CSV folder buttons and opens the folder, if no folder is set: it asks for the directory
