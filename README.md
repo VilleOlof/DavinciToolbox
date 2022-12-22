@@ -9,18 +9,18 @@ Everything is saved and loaded between script restarts.
 **Includes Features Like:**
 - 6 Savable Script Buttons
 - 4 Savable Folder Buttons
-- Information UI
- - Current Playhead Timecode
- - Timeline Framerate
- - Total Amount Of Clips
+- Information UI  
+ Current Playhead Timecode  
+ Timeline Framerate  
+ Total Amount Of Clips  
 - Accurate Timer
 - Two Counters (And Their Difference And Sum)
 - Start And End Marker Buttons
-- Render Buttons
- - Choose Render Preset
- - Choose Render Name
- - Choose Render Filepath
- - Add Render Job
+- Render Buttons  
+ Choose Render Preset  
+ Choose Render Name  
+ Choose Render Filepath  
+ Add Render Job  
 - Proccessed Increment Label
 - Video Progression (Loading Bar)
 - Content Filled (Loading Bar)
@@ -35,16 +35,19 @@ Find the script inside DaVinci Resolve, Under Workspace>Scripts>Toolbox
 It's that easy.   
 No Further Setup Required
 ## UI Breakdown
+
 ### Savable Script Buttons
 These six buttons is able to run other lua script files.  
 If no script is assigned, clicking the "No Script Selected"  
 Will prompt you to select a new .lua file to assign to that button.  
 Clicking the "X" besides the run button will reset the script it was assigned to.  
+
 ### Savable Folder Buttons
 These four buttons is able to open folders.  
 If no folder is assigned, clicking the "No Folder Selected"  
 Will prompt you to select a new folder to assign to that button.  
 Clicking the "X" besides the open button will reset the folder it was assigned to.  
+
 ### Information UI
 This dark-grey box contains useful information while editing.  
 
@@ -65,17 +68,20 @@ It's very accurate and can be Started/Paused and reset right below it.
 There is also a "Start Editing" button right below the box which will  
 when clicked, basically click "Start Timer", "Add Start Marker" and "Start Progressbar"  
 At the same time. Useful for when you are starting to edit and want to activate everything.  
-###Two Counters
+
+### Two Counters
 These two function the same.  
 You have a reset, +1 and -1 for both.  
 And a difference and sum labels right of them.
-###Start And End Marker Buttons
+
+### Start And End Marker Buttons
 These markers can't be place manually and must be placed with the script buttons.  
 These will be used to calculate a range of things.  
 The start marker is meant to be the start of your video (If it's not at the start of the timeline)  
 And the end marker is the same but for the end, but incase you don't have anything at the end,  
 it won't really matter if the end marker is there.
-###Render Buttons
+
+### Render Buttons
 If your render exports are simple enough,  
 You will never have to use the render tab again (Except the actual "Render" button)  
 
@@ -85,10 +91,12 @@ The dropdown right next is all your current render presets (Even custom ones), S
 Under the "Add render job" button is the render filepath,  
 it will be automatically written to if you used the ".../" button, otherwise it can manually be filled in.  
 And lastly, the last text box is for the export file name (With it's correct extension)  
-###Proccessed Increment Label
+
+### Proccessed Increment Label
 When you click "Start Progressbar" it will take the last frame of the timeline,  
 And for every frame you remove from that point will count towards this label in HH:MM:SS
-###Video Progression
+
+### Video Progression
 This includes four UI elements:  
 The "Length" text box (Default to 8) is the amount of minutes you want your final edit to be.  
 And clicking "Start Progressbar" will take the last frame of the timeline,  
@@ -96,15 +104,18 @@ and calculate from the start of the timeline (or start marker if there is one)
 And 8 minutes into the timeline, and the "Video Progression" percentange  
 Will change for every frame you cut down until you reach 100% (The target minutes)  
 This will also be displayed in a 100 segment loading bar right beneath the percentage
-###Content Filled
+
+### Content Filled
 This works similar to the other loading bar,  
 This counts from the start of the timeline (Or start marker if there is one) as 0%  
 And the last frame of the timeline (or end marker if there is one) as 100%  
 And take your current playheads position as the percentage.  
 This lets you see how close you are to your end marker.
-###Notes
+
+### Notes
 A simple text box only used to store notes in
-###Save To CSV
+
+### Save To CSV
 [This currently only exports the raw lua table to file]  
 The "Save To CSV" button wont work unless you have given it a valid filepath.  
 The button right next to it, "CSV Folder". When pressed prompt you to select a folder.  
