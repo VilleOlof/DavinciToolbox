@@ -162,4 +162,4 @@ Default: `true`
 This determines how big the notes text box is at startup  
 Default: `100`
 
-**Version 1.0.0 [Public Release] 2022-12-22 15:20 CET**
+**Version 1.0.1 [Public Release] 2022-12-22 17:32 CET**
