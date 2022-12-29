@@ -1367,12 +1367,6 @@ local function WindowDynamics(win, itm, ui, disp)
 
         --Save the current script before reloading
         table.save(Data, SavePath)
-        
-        --Copies the current settings to the new profile when creating one if CopyPreviousProfile is enabled
-        if CopyPreviousProfile then 
-            local newDataFile = "Toolbox_"..itm.NewProfileName_LineEdit.Text.."_SaveData.tbl"
-            table.save(Data, SavePath_Prefix..newDataFile)
-        end
 
         --Changes the global data profile and saves it for the reload
         GlobalData.SelectedProfile = GlobalData.Profiles[itm.Profiles_Combobox.CurrentIndex+1]
@@ -1390,6 +1384,12 @@ local function WindowDynamics(win, itm, ui, disp)
 
         table.insert(GlobalData.Profiles, profileName)
         table.save(GlobalData, GlobalDataFullPath)
+
+        --Copies the current settings to the new profile when creating one if CopyPreviousProfile is enabled
+        if CopyPreviousProfile then 
+            local newDataFile = "Toolbox_"..profileName.."_SaveData.tbl"
+            table.save(Data, SavePath_Prefix..newDataFile)
+        end
 
         AddProfilesToCombo(itm)
     end
