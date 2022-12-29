@@ -1,11 +1,21 @@
 -- Made by: VilleOlof
 -- https://github.com/VilleOlof
--- Version 1.0.1 [Public Release] 2022-12-22 17:32 CET
+-- Version 1.2.3 [Public Release] 2022-12-29  03:31 CET
+--Added Save Profiles
+--Fixed Content Filled not accounting for start marker thats not the start of timeline.
+--Added Video Name Suffix (name_number.extension)
+--Added a key-value table > CSV function (Export as CSV now works instead of .tbl file)
+--Refined the startup, it now only switches to the render page once and back, less flickering
+--Fixed "Start Editing" stopping the timer if started before
+::Start::
 
 --## Variables/Settings to change:
 
+--The name of the standard savedata file
+local SavePath_File = "Toolbox_Standard_SaveData.tbl"
+
 --Decides where it should save the "Data" table
-local SavePath = os.getenv('APPDATA')..[[/Blackmagic Design/DaVinci Resolve/Toolbox_SaveData.tbl]]
+local SavePath_Prefix = os.getenv('APPDATA')..[[/Blackmagic Design/DaVinci Resolve/Toolbox/]]
 
 --Decides if it's only gonna count clips in track 1 for the "total clip count" in the UI
 local OnlyCountTrackOne = false
@@ -62,6 +72,8 @@ if OnlyCountTrackOne then ClipCountText = "Track One Amount Of Clips: " end
 local IsEditing = false
 local IsTimerRunning = false
 local FirstTimerRan = false
+local restartScript = false
+local SwitchBackToEditPage = false
 
 --Main Timer:
 local HeadTimer
@@ -187,22 +199,122 @@ local function exportstring( s )
     end
     return tables[1]
  end
- ------------------------------------
-
- --Tries to rename the file (or dir) to its exact same name to see if the file exists
- local function FileExists(file)
-    local ok, err, code = os.rename(file, file)
-    if not ok then
-       if code == 13 then
-          -- Permission denied, but it exists
-          return true
-       end
+------------------------------------
+--Takes a key value pair table as the parameter
+--and converts it to a CSV string, able to be exported later to file
+local function GetCSVString(table)
+    local escTbl = { [[\r]], [[\n]], [[,]], [["]] }
+    local _keys, _values = {}, {}
+    local result = ""
+    for k, v in pairs(table) do
+        if k ~= nil and v ~= nil then
+            _keys[#_keys+1] = k
+            _values[#_values+1] = v
+        end
     end
-    return ok, err
- end
+    for i, key in ipairs(_keys) do
+        local tmp = key
+        for i, char in ipairs(escTbl) do
+            if string.match(tmp, char) then
+                tmp = "\""..tmp.."\""
+                break
+            end
+        end
+        result = result..tmp..","
+    end
+    result = result:sub(1,-2)
+    result = result.."\n"
+    for i, value in ipairs(_values) do
+        local tmp = value
+        if type(tmp) == "number" then tmp = tostring(tmp) end
+        local charCount = 0
+        for j = 1, #tmp do
+            local char = tmp:sub(j+charCount,j+charCount)
+            if char == [["]] then
+                tmp = tmp:sub(1,j)..[["]]..tmp:sub(j+1)
+                charCount = charCount + 1
+            end
+        end
+        for i, char in ipairs(escTbl) do
+            if string.match(tmp, char) then
+                tmp = "\""..tmp.."\""
+                break
+            end
+        end
+        result = result..tmp..","
+    end
+    result = result:sub(1,-2)
+    return result
+end
 
- --Ensures that the SavePath is correct
- SavePath = SavePath:gsub('\\','/')
+--Seperates an entire path into [--FilePath, -FileName, -Extension]
+--https://stackoverflow.com/questions/5243179/what-is-the-neatest-way-to-split-out-a-path-name-into-its-components-in-lua
+local function DeconstructFilepath(path, cleanFileName, dirChar)
+    if not dirChar then dirChar = "\\" end
+    local path, name, ext = string.match(path, "(.-)([^"..dirChar.."]-([^%.]+))$")
+    if cleanFileName then name = name:sub(1,-#ext-2) end -- removes the extension from the name
+    return path, name, ext
+end
+--Tries to rename the file (or dir) to its exact same name to see if the file exists
+local function FileExists(file)
+   local ok, err, code = os.rename(file, file)
+   if not ok then
+      if code == 13 then
+         -- Permission denied, but it exists
+         return true
+      end
+   end
+   return ok, err
+end
+
+--Waits X Amount of seconds
+local function Wait(second, millisecond)
+    local ostime_vrbl = os.time() + second, millisecond
+    while os.time() < ostime_vrbl do end
+end
+
+--Doesn't exit the loop until either the specified file exists or it reached its retry limit
+local function FileTimeout(file, limit)
+    local count = 0
+
+    while true do
+        local success = FileExists(file)
+        if success then return true end
+        count = count + 1
+        if count >= limit then return false end
+        Wait(0.25)
+    end
+end
+
+--GlobalData, accessed through every profile
+local GlobalData = {
+    SelectedProfile = "Standard",
+    Profiles = { "Standard", },
+}
+local GlobalDataPath = "Toolbox_Global.tbl"
+local GlobalDataFullPath = SavePath_Prefix..GlobalDataPath
+
+--Ensures that the folder that the save data gets saved into exists.
+local Save_Path, Save_Name, Save_Ext = DeconstructFilepath(GlobalDataFullPath, true, "/")
+if not FileExists(Save_Path) then io.popen("mkdir \""..Save_Path.."\"") end
+local toolboxFolderCreation = FileTimeout(SavePath_Prefix, 10)
+
+--Creates a new global data file if it doesnt exist or loads one if it does
+if not FileExists(GlobalDataFullPath) then 
+    io.popen("type nul > "..GlobalDataFullPath) --creates the global.tbl file
+    table.save(GlobalData, GlobalDataFullPath) --saves the standard default table into it
+else
+    --Global.tbl already exists
+    GlobalData = table.load(GlobalDataFullPath) --loads in the global data
+end
+
+--Combines the SavePath_Prefix dir and file
+local SaveProfile = "Toolbox_"..GlobalData.SelectedProfile.."_SaveData.tbl"
+local SavePath = SavePath_Prefix..SaveProfile
+
+--Ensures that the SavePath is correct
+SavePath = SavePath:gsub('\\','/')
+------------------
 
 --Loads table data into the data variable at SavePath if the file exists
 if FileExists(SavePath) then Data = table.load(SavePath) end
@@ -235,11 +347,54 @@ local function GetLastFolderInPath(path)
     return path
 end
 
---[Temporary Until CSV Writer Works] 
---Takes a filePath and a table and writes it to file with the current date as name (dd_mm_yyyy-hh:mm:ss)
+--Gets the amount of files with a certain name in a directory
+function GetFileCount(path, fileName, extra_number)
+    local count = 0
+
+    --just removing the last / from the 'selectedPath' to make the command
+    local text = path:sub(1, -2)
+
+    local Dir_CMD = "dir \""..text.."\" /b"
+
+    for file in io.popen(Dir_CMD):lines() do 
+
+        local fixed_cap = file:sub(1,#fileName)
+        
+        if (fixed_cap == fileName) then
+            count = count + 1
+        end
+    end
+
+    return count+extra_number
+end
+
+-- Return the first index with the given value (or nil if not found).
+local function IndexOf(array, value)
+    for i, v in ipairs(array) do
+        if v == value then
+            return i
+        end
+    end
+    return nil
+end
+
+local function TableContains(table, value)
+    for i, v in ipairs(table) do
+        if v == value then return true end
+    end
+    return false
+end
+
+
+--Takes a filePath and a table (and converts the data to the .csv format) and writes it to file with the current date as name (dd_mm_yyyy-hh:mm:ss)
 local function SaveTableToDataFile(filePath, Data)
-    local full_Path = filePath.."ToolboxData-"..(os.date("%d_%m_%Y-%X")):gsub(":","_")..".tbl"
-    table.save(Data, full_Path)
+    local CSV = GetCSVString(Data)
+
+    local full_Path = filePath.."ToolboxData-"..(os.date("%d_%m_%Y-%X")):gsub(":","_")..".csv"
+
+    local _file = io.open(full_Path, "w")
+    _file:write(CSV)
+    _file:close()
 end 
 
 --Removes The 01:00:00 That Davinki Usually Starts at For Calculations
@@ -404,11 +559,16 @@ local function StartVideoProgress()
     EndFrame_Start = RemoveStartFrame(timeline:GetEndFrame())
 end
 
+--Calculates the Target "Frame ID" based on user input and timeline framerate
+local function GetTargetFrame(itm)
+    return (tonumber(itm.Progression_TargetMinutes.Text)*60)*timeline:GetSetting("timelineFrameRate")
+end 
+
 --Get the current video progress compared to the start marker (if not found, start of timeline),
 --and the EndFrame_Start to calculate the percentage
 local function GetVideoProgress(itm)
     if itm.Progression_TargetMinutes.Text == "" then return end
-    local targetFrame = (tonumber(itm.Progression_TargetMinutes.Text)*60)*timeline:GetSetting("timelineFrameRate")
+    local targetFrame = GetTargetFrame(itm)
     if MarkerFrame ~= 0 then targetFrame = targetFrame + MarkerFrame end
     
     local FrameDiff = EndFrame_Start - targetFrame
@@ -429,10 +589,9 @@ local function GetContentFilledProgress(itm)
 
     local PlayheadFrame = GetCurrentFrame()
 
-    local EndFrame = RemoveStartFrame(timeline:GetEndFrame())
-    if timeline:GetMarkerByCustomData(EndMarkerData) then EndFrame = EndMarkerFrame end
+    local targetFrame = StartFrame + GetTargetFrame(itm)
 
-    local FrameDiff = EndFrame - StartFrame
+    local FrameDiff = targetFrame - StartFrame
     local CurrentPlaceInProgress = (PlayheadFrame-StartFrame)/FrameDiff*100
 
     CurrentPlaceInProgress = clamp(CurrentPlaceInProgress, 0, 100)
@@ -454,7 +613,7 @@ local function UpdateUITimecode(itm)
     itm.TimeFromStartAtPlayHead.Text = disp_time(Seconds, true)
 end
 
---[BROKEN CURRENTLY] Gets how much content (from the raw cut) you have edited down.
+--Gets how much content (from the raw cut) you have edited down.
 local function ContentProccessed(itm)
     local FrameDiff = EndFrame_Start - RemoveStartFrame(timeline:GetEndFrame())
     local Seconds = math.max(FrameDiff/timeline:GetSetting("timelineFrameRate"),0)
@@ -626,6 +785,13 @@ local function StopMainTimer(itm)
     IsTimerRunning = false
 end
 
+local function StartMainTimer(itm)
+    UI_Timer_OSClock = os.clock() - UI_Timer_Elapsed
+    itm.Timer_StartStop.Text = "Stop Timer"
+    IsTimerRunning = true
+end
+
+--If there is a CSV Folder Path, save the data to it and display a visual message
 local function CSVHandleButton(itm)
     if Data.CSVFolderPath then
         SaveTableToDataFile(Data.CSVFolderPath, Data)
@@ -634,6 +800,31 @@ local function CSVHandleButton(itm)
     end
 end
 
+--Incase you decide to render multiple clips of the same name within the same render session
+local NotYetRenderedCount = 0
+
+--Makes sure that no file can be exported with the same name (adds a number to the name, before the .ext)
+--There is some scenarios where you can export an already existing file if you delete render jobs/files during script use
+--Might fix that at some point but this is good enough for now.
+local function AddRenderNameSuffixNumber(RenderDirectory, RenderFileName)
+    local fileName_Attempts = 0
+    local fileCount = 0
+    while true do
+        local path, name, ext = DeconstructFilepath(RenderDirectory..RenderFileName, true)
+
+        local combinedPathName = path..name
+        local path = combinedPathName.."_"..fileCount.."."..ext
+
+        if not FileExists(path) then 
+            return name.."_"..(fileCount+NotYetRenderedCount).."."..ext
+        end
+
+        fileCount = GetFileCount(path, name.."_"..fileCount, fileName_Attempts)
+        fileName_Attempts = fileName_Attempts + 1
+    end
+end
+
+--Adds a render job with the current settings and preset
 local function AddRenderJob(itm)
     local frameStart = timeline:GetStartFrame()
     if CheckIfStartMarkerExists() then frameStart = timeline:GetStartFrame() + MarkerFrame end
@@ -649,6 +840,8 @@ local function AddRenderJob(itm)
     local RenderFileName = ""
     if itm.RenderCustomName.Text ~= "" then RenderFileName = itm.RenderCustomName.Text else return end
 
+    RenderFileName = AddRenderNameSuffixNumber(RenderDirectory, RenderFileName)
+
     local settings = {
         SelectAllFrames = false,
         TargetDir = RenderDirectory,
@@ -659,7 +852,8 @@ local function AddRenderJob(itm)
     proj:SetRenderSettings(settings)
     
     proj:AddRenderJob()
-    resolve:OpenPage("edit")
+    NotYetRenderedCount = #proj:GetRenderJobList()
+    if SwitchBackToEditPage then resolve:OpenPage("edit") end
 end
 
 local function AddCounterBox(ui, boxIndex, leftLabel)
@@ -704,7 +898,7 @@ end
 
 --Adds all the UI elements into one window and returns it.
 local function WindowElements(disp, ui)
-    local width, height = 600, 611 + NoteSize
+    local width, height = 600, 646 + NoteSize --611
     local TopBoxWidth, TopBoxHeight = 325, 200
 
     --The one and only allowed "ui:Timer"
@@ -1050,6 +1244,36 @@ local function WindowElements(disp, ui)
                 },
                 ui:HGap(25),
             },
+            ui:VGap(5),
+            --Profile Buttons etc.
+            ui:HGroup{
+                ui:Label{
+                    ID = "ProfileCosmetic_Text",
+                    Text = "Change Profile >",
+                    FixedSize = {100, 20},
+                },
+                ui:ComboBox{
+                    ID = "Profiles_Combobox",
+                    Text = "Profiles",
+                    FixedSize = {130, 20},
+                },
+                ui:HGap(5),
+                ui:Button{
+                    ID = "RemoveProfile_Button",
+                    Text = "Del",
+                    FixedSize = { 30, 20 },
+                },
+                ui:LineEdit{
+                    ID = "NewProfileName_LineEdit",
+                    PlaceholderText = "Profile Name",
+                    FixedSize = {130, 20},
+                },
+                ui:Button{
+                    ID = "CreateNewProfile_Button",
+                    Text = "Create New Profile",
+                    FixedSize = {130, 20},
+                },
+            },
         },
     })
 
@@ -1063,8 +1287,19 @@ local function AddRenderPresetsToCombo(itm)
     for index, preset in ipairs(renderPresetList) do itm.RenderPresets:AddItem(preset) end
 end
 
+--Adds all the current profiles in GlobalData to a combo box (drop-down)
+local function AddProfilesToCombo(itm)
+    itm.Profiles_Combobox:Clear() --makes sure its empty before adding everything.
+    for i, profile in ipairs(GlobalData.Profiles) do itm.Profiles_Combobox:AddItem(profile) end
+
+    local index = IndexOf(GlobalData.Profiles, GlobalData.SelectedProfile)
+    if index == nil then index = 0 else index = index -1 end
+
+    itm.Profiles_Combobox.CurrentIndex = index
+end
+
 --Handles UI-Element Buttons Etc.
-local function WindowDynamics(win, itm, ui)
+local function WindowDynamics(win, itm, ui, disp)
 
     --Saves the updates target minute to Data
     function win.On.Progression_TargetMinutes.TextChanged(ev)
@@ -1096,7 +1331,7 @@ local function WindowDynamics(win, itm, ui)
         if not IsEditing then
             AddStartMarker()
             StartVideoProgress()
-            MainTimer(ui, itm)
+            StartMainTimer(itm)
             itm.Timer_Combo.Text = "Stop Editing"
             IsEditing = true
         else
@@ -1118,7 +1353,52 @@ local function WindowDynamics(win, itm, ui)
         Data.RenderPresetIndex = currentBoxIndex
 
         proj:LoadRenderPreset(renderPresetList[currentBoxIndex])
-        resolve:OpenPage("edit")
+        if SwitchBackToEditPage then resolve:OpenPage("edit") end
+    end
+
+    --Change Profile
+    function win.On.Profiles_Combobox.CurrentIndexChanged(ev)
+        if GlobalData.SelectedProfile == GlobalData.Profiles[itm.Profiles_Combobox.CurrentIndex+1] then return end
+
+        --Save the current script before reloading
+        table.save(Data, SavePath)
+
+        --Changes the global data profile and saves it for the reload
+        GlobalData.SelectedProfile = GlobalData.Profiles[itm.Profiles_Combobox.CurrentIndex+1]
+        table.save(GlobalData, GlobalDataFullPath)
+
+        --Exits the UI Loop and sets restarting to true
+        restartScript = true
+        disp:ExitLoop()
+    end
+
+    --Creates a new profile and saves it
+    function win.On.CreateNewProfile_Button.Clicked(ev)
+        if not itm.NewProfileName_LineEdit.Text or itm.NewProfileName_LineEdit.Text == "Standard" or TableContains(GlobalData.Profiles, itm.NewProfileName_LineEdit.Text) or itm.NewProfileName_LineEdit.Text == "" then return end
+        local profileName = itm.NewProfileName_LineEdit.Text
+
+        table.insert(GlobalData.Profiles, profileName)
+        table.save(GlobalData, GlobalDataFullPath)
+
+        AddProfilesToCombo(itm)
+    end
+
+    --Removes a profile and delete its data
+    function win.On.RemoveProfile_Button.Clicked(ev)
+         if not itm.NewProfileName_LineEdit.Text or itm.NewProfileName_LineEdit.Text == "Standard" then return end
+         local profileName = itm.NewProfileName_LineEdit.Text
+
+         local profileIndex = IndexOf(GlobalData.Profiles, profileName)
+         if profileIndex == nil then return end
+         table.remove(GlobalData.Profiles, profileIndex)
+         table.save(GlobalData, GlobalDataFullPath)
+
+         local ResetDataFile = "Toolbox_"..itm.NewProfileName_LineEdit.Text.."_SaveData.tbl"
+         table.save({}, SavePath_Prefix..ResetDataFile)
+
+         if GlobalData.SelectedProfile == profileName then Data = {} end
+
+         AddProfilesToCombo(itm)
     end
 
     --Adds The Current Settings And Render Settings As a New Job
@@ -1317,6 +1597,9 @@ local function CreateWindow()
     --Sets the index to default
     itm.RenderPresets.CurrentIndex = RenderPresetDefaultIndex
 
+    --Add Profiles to the profiles combo
+    AddProfilesToCombo(itm)
+
     --Update Things Inside Of This
     local ProgressionCurrentTimer = 0
     local TenSecondCurrentTimer = 0
@@ -1325,6 +1608,8 @@ local function CreateWindow()
         --These things should only be ran "once" but inside the timeout, it just works this way okay
         if not FirstTimerRan then
             if timeline then Data.ClipCount = GetTotalClipCount() end
+            resolve:OpenPage("edit")
+            SwitchBackToEditPage = true
             UpdateCounter(itm)
             FixUITimerAtStartup(itm)
             if Data.RenderPresetIndex and UseLastPresetWhenStarting then itm.RenderPresets.CurrentIndex = Data.RenderPresetIndex - 1 end
@@ -1353,13 +1638,15 @@ local function CreateWindow()
             --Removes the visibility of the side label for CSV
             if itm.CSVSave_SideLabel.Visible then itm.CSVSave_SideLabel.Visible = false end
         end
+        
+        NotYetRenderedCount = #proj:GetRenderJobList()
 
         UpdateUITimecode(itm)
         FirstTimerRan = true
     end
 
     -- Handles all the element events
-    WindowDynamics(win, itm, ui)
+    WindowDynamics(win, itm, ui, disp)
 
     HeadTimer:Start()
 
@@ -1381,4 +1668,11 @@ local function Main()
 end
 
 Main()
+
+--"Restarts" the script
+if restartScript then 
+    restartScript = false
+    goto Start 
+end
+
 ::EndScript::
