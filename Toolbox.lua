@@ -1,12 +1,13 @@
 -- Made by: VilleOlof
 -- https://github.com/VilleOlof
--- Version 1.2.3 [Public Release] 2022-12-29  03:31 CET
+-- Version 1.2.4 [Public Release] 2022-12-29  14:08 CET
 --Added Save Profiles
 --Fixed Content Filled not accounting for start marker thats not the start of timeline.
 --Added Video Name Suffix (name_number.extension)
 --Added a key-value table > CSV function (Export as CSV now works instead of .tbl file)
 --Refined the startup, it now only switches to the render page once and back, less flickering
 --Fixed "Start Editing" stopping the timer if started before
+--Added a CopyPreviousProfile option when creating new profiles
 ::Start::
 
 --## Variables/Settings to change:
@@ -42,6 +43,10 @@ local UseLastTargetMinuteWhenStarting = true
 
 --Changes how big the note text box is, (Default is 100)
 local NoteSize = 100
+
+--When creating a new profile, this decides if it's gonna copy the current profile data to the new one 
+--or create a fresh profile, Default is true
+local CopyPreviousProfile = true
 
 --########################################################
 -- ## Don't touch variables but you can if you want: ## --
@@ -1362,6 +1367,12 @@ local function WindowDynamics(win, itm, ui, disp)
 
         --Save the current script before reloading
         table.save(Data, SavePath)
+        
+        --Copies the current settings to the new profile when creating one if CopyPreviousProfile is enabled
+        if CopyPreviousProfile then 
+            local newDataFile = "Toolbox_"..itm.NewProfileName_LineEdit.Text.."_SaveData.tbl"
+            table.save(Data, SavePath_Prefix..newDataFile)
+        end
 
         --Changes the global data profile and saves it for the reload
         GlobalData.SelectedProfile = GlobalData.Profiles[itm.Profiles_Combobox.CurrentIndex+1]
