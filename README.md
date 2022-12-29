@@ -1,7 +1,7 @@
 # DaVinci Toolbox
 Your left hand in editing!  
 Packed with a bunch of small (but useful and powerful) features.  
-Over 1350 Lines Of Lua Code, Tailored Towards More Casual Editing.  
+Over 1600 Lines Of Lua Code, Tailored Towards More Casual Editing.  
 Everything is saved and loaded between script restarts.  
 
 *Only works on windows currently*
@@ -25,7 +25,8 @@ Everything is saved and loaded between script restarts.
 - Video Progression (Loading Bar)
 - Content Filled (Loading Bar)
 - Notes
-- Save To CSV (Currently Lua Table)
+- Save To CSV
+- Save Profiles (Saves Your Current Data)
 
 ## Installation
 Download the newest release or clone the repo.  
@@ -116,10 +117,14 @@ This lets you see how close you are to your end marker.
 A simple text box only used to store notes in
 
 ### Save To CSV
-[This currently only exports the raw lua table to file]  
 The "Save To CSV" button wont work unless you have given it a valid filepath.  
 The button right next to it, "CSV Folder". When pressed prompt you to select a folder.  
 And everytime you Save To CSV, it will create a new file with the current date and time in that folder.  
+
+### Save Profiles
+At the bottom you can choose multiple profiles.  
+Enter profile name to remove it or to create a new one.  
+The script will refresh itself when changing profile.  
 
 ## Settings
 Settings for the script is changed at the top of the .lua file itself.  
@@ -162,4 +167,4 @@ Default: `true`
 This determines how big the notes text box is at startup  
 Default: `100`
 
-**Version 1.0.1 [Public Release] 2022-12-22 17:32 CET**
+**Version 1.2.3 [Public Release] 2022-12-29  03:31 CET**
