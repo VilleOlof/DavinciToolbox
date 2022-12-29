@@ -167,4 +167,8 @@ Default: `true`
 This determines how big the notes text box is at startup  
 Default: `100`
 
-**Version 1.2.3 [Public Release] 2022-12-29  03:31 CET**
+- CopyPreviousProfile (bool)  
+This determines if it's gonna copy your current profile data to the new one when creating one  
+Default: `true`
+
+**Version 1.2.4 [Public Release] 2022-12-29  14:08 CET**
